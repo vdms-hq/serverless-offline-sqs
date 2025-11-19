@@ -1,44 +1,5 @@
 # serverless-offline-sqs
 
-### Why we forked (copied) this repo?
-
-We have to changed in file `sqs.js` how lambda was launched.
-
-Old method:
-```javascript
-const lambdaFunction = this.lambda.get(functionKey);
-const event = new SQSEvent(Messages, this.region, arn);
-lambdaFunction.setEvent(event);
-await lambdaFunction.runHandler();
-```
-New method:
-```javascript
-const url = `http://localhost:3002/2015-03-31/functions/aws-vida-local-${functionKey}/invocations`
-const event = new SQSEvent(Messages, this.region, arn);
-await fetch(url, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify(event)
-});
-```
-(also was need to add `node-fetch` in version 2.
-
-### Why we need this changes?
-In typeorm we are finding metadata using comparison of functions. Lambda launched by this plugin using the same RDS connection had problem with comparing metadata functions (cannot find it using function comparison). 
-
-Launching it in this way is solving this problem. Another solution was to using another RDS connections, or reset actual one but this was causing another problems.
-
-### Used version: 6.0.0
-Higher had problem with our actual version of serverless.
-
-### Link to oroginal repo: 
-https://github.com/CoorpAcademy/serverless-plugins
-
-# ORIGINAL README:
-
-
 This Serverless-offline plugin emulates AWS λ and SQS queue on your local machine. To do so, it listens SQS queue and invokes your handlers.
 
 _Features_:
@@ -54,7 +15,7 @@ First, add `serverless-offline-sqs` to your project:
 npm install serverless-offline-sqs
 ```
 
-Then inside your project's `serverless.yml` file, add following entry to the plugins section before `serverless-offline` (and after `serverless-webpack` if presents): `serverless-offline-sqs`.
+Then inside your project's `serverless.yml` file, add following entry to the plugins section before `serverless-offline` (and after `serverless-webpack` if present): `serverless-offline-sqs`.
 
 ```yml
 plugins:
@@ -69,7 +30,7 @@ plugins:
 
 To be able to emulate AWS SQS queue on local machine there should be some queue system actually running. One of the existing implementations suitable for the task is [ElasticMQ](https://github.com/adamw/elasticmq).
 
-[ElasticMQ](https://github.com/adamw/elasticmq) is a standalone in-memory queue system, which implements AWS SQS compatible interface. It can be run either stand-alone or inside Docker container. See [example](../serverless-offline-sqs-integration/docker-compose.yml) `sqs` service setup.
+[ElasticMQ](https://github.com/adamw/elasticmq) is a standalone in-memory queue system, which implements AWS SQS compatible interface. It can be run either stand-alone or inside Docker container. See [example](../../tests/serverless-plugins-integration/serverless.sqs.yml) `sqs` service setup.
 
 We also need to setup actual queue in ElasticMQ server, we can use [AWS cli](https://aws.amazon.com/cli/) tools for that. In example, we spawn-up another container with `aws-cli` pre-installed and run initialization script, against ElasticMQ server in separate container.
 
