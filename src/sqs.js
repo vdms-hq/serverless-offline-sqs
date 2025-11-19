@@ -1,8 +1,27 @@
 const SQSClient = require('aws-sdk/clients/sqs');
-const fetch = require('node-fetch');
-// eslint-disable-next-line no-shadow
-const {pipe, get, values, matches, find, mapValues, isPlainObject, toString} = require('lodash/fp');
-const {logWarning} = require('serverless-offline/dist/serverlessLog');
+
+const {
+  chunk,
+  find,
+  get,
+  isPlainObject,
+  mapValues,
+  matches,
+  pipe,
+  toString,
+  values
+} = require('lodash/fp');
+// Simple logger to avoid Node v22 module resolution issues with @serverless/utils/log
+const log = {
+  debug: (...args) => {
+    if (process.env.SLS_DEBUG) {
+      console.log('[DEBUG]', ...args);
+    }
+  },
+  warning: (...args) => {
+    console.warn('[WARNING]', ...args);
+  }
+};
 const {default: PQueue} = require('p-queue');
 const SQSEventDefinition = require('./sqs-event-definition');
 const SQSEvent = require('./sqs-event');
@@ -73,7 +92,7 @@ class SQS {
   }
 
   async _sqsEvent(functionKey, sqsEvent) {
-    const {enabled, arn, queueName, batchSize} = sqsEvent;
+    const {enabled, arn, queueName, batchSize = 10} = sqsEvent;
 
     if (!enabled) return;
 
@@ -83,41 +102,53 @@ class SQS {
       (await this.client.getQueueUrl({QueueName: queueName}).promise()).QueueUrl
     );
 
-    const job = async () => {
+    const getMessages = async (size, messages = []) => {
+      if (size <= 0) return messages;
+
       const {Messages} = await this.client
         .receiveMessage({
           QueueUrl,
-          MaxNumberOfMessages: batchSize,
+          MaxNumberOfMessages: size > 10 ? 10 : size,
           AttributeNames: ['All'],
           MessageAttributeNames: ['All'],
           WaitTimeSeconds: 5
         })
         .promise();
 
-      if (Messages) {
+      if (!Messages || Messages.length === 0) return messages;
+      return getMessages(size - Messages.length, [...messages, ...Messages]);
+    };
+
+    const job = async () => {
+      const messages = await getMessages(batchSize);
+
+      if (messages.length > 0) {
         try {
-          const url = `http://localhost:3002/2015-03-31/functions/aws-vida-local-${functionKey}/invocations`
-          const event = new SQSEvent(Messages, this.region, arn);
+          const lambdaFunction = this.lambda.get(functionKey);
 
-          await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(event)
-          });
+          const event = new SQSEvent(messages, this.region, arn);
+          lambdaFunction.setEvent(event);
 
-          await this.client
-            .deleteMessageBatch({
-              Entries: (Messages || []).map(({MessageId: Id, ReceiptHandle}) => ({
+          await lambdaFunction.runHandler();
+
+          await Promise.all(
+            chunk(
+              10,
+              (messages || []).map(({MessageId: Id, ReceiptHandle}) => ({
                 Id,
                 ReceiptHandle
-              })),
-              QueueUrl
-            })
-            .promise();
+              }))
+            ).map(Entries =>
+              this.client
+                .deleteMessageBatch({
+                  Entries,
+                  QueueUrl
+                })
+                .promise()
+            )
+          );
         } catch (err) {
-          logWarning(err.stack);
+          log.warning(err.stack);
         }
       }
 
@@ -149,7 +180,7 @@ class SQS {
     } catch (err) {
       if (remainingTry > 0 && err.name === 'AWS.SimpleQueueService.NonExistentQueue')
         return this._createQueue({queueName}, remainingTry - 1);
-      logWarning(err.stack);
+      log.warning(err.stack);
     }
   }
 }
