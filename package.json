@@ -2,15 +2,15 @@
   "name": "serverless-offline-sqs",
   "version": "6.0.0",
   "description": "Emulate AWS λ and SQS locally when developing your Serverless project",
-  "main": "src",
+  "main": "src/index.js",
   "repository": {
     "type": "git",
-    "url": "git@github.com:CoorpAcademy/serverless-plugins.git"
+    "url": "git@github.com:vdms-hq/serverless-offline-sqs.git"
   },
   "bugs": {
-    "url": "https://github.com/CoorpAcademy/serverless-plugins/issues"
+    "url": "https://github.com/vdms-hq/serverless-offline-sqs/issues"
   },
-  "homepage": "https://github.com/CoorpAcademy/serverless-plugins/tree/master/packages/serverless-offline-sqs#readme",
+  "homepage": "https://github.com/vdms-hq/serverless-offline-sqs#readme",
   "files": [
     "src/index.js",
     "src/sqs.js",
@@ -24,19 +24,18 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": ">=12"
+    "node": ">=18 <=22"
   },
   "peerDependencies": {
-    "serverless-offline": "^8.0.0"
+    "serverless-offline": "^13.0.0 || ^14.0.0"
   },
   "dependencies": {
-    "aws-sdk": "^2.970.0",
+    "aws-sdk": "^2.1234.0",
     "lodash": "^4.17.21",
-    "node-fetch": "^2.6.7",
     "p-queue": "^6.6.2"
   },
   "devDependencies": {
-    "serverless-offline": "^8.0.0"
+    "serverless-offline": "^13.6.0"
   },
   "keywords": [
     "sqs",
