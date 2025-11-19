@@ -6,13 +6,38 @@ _Features_:
 
 - [Serverless Webpack](https://github.com/serverless-heaven/serverless-webpack/) support.
 - SQS configurations: batchsize.
+- Node.js v22 compatibility
+- Support for serverless-offline v13 and v14
+
+## Requirements
+
+- Node.js >= 22.0.0 (required for this version)
+- serverless-offline ^13.0.0 or ^14.0.0
 
 ## Installation
 
-First, add `serverless-offline-sqs` to your project:
+### From npm registry
 
 ```sh
 npm install serverless-offline-sqs
+```
+
+### From GitHub (vdms-hq organization)
+
+To install a specific branch from the GitHub repository:
+
+```sh
+npm install github:vdms-hq/serverless-offline-sqs#node-v22-support
+```
+
+Or add to your `package.json`:
+
+```json
+{
+  "devDependencies": {
+    "serverless-offline-sqs": "github:vdms-hq/serverless-offline-sqs#node-v22-support"
+  }
+}
 ```
 
 Then inside your project's `serverless.yml` file, add following entry to the plugins section before `serverless-offline` (and after `serverless-webpack` if present): `serverless-offline-sqs`.
@@ -24,19 +49,24 @@ plugins:
   - serverless-offline
 ```
 
-[See example](../../tests/serverless-plugins-integration/README.md#sqs)
-
 ## How it works?
 
 To be able to emulate AWS SQS queue on local machine there should be some queue system actually running. One of the existing implementations suitable for the task is [ElasticMQ](https://github.com/adamw/elasticmq).
 
-[ElasticMQ](https://github.com/adamw/elasticmq) is a standalone in-memory queue system, which implements AWS SQS compatible interface. It can be run either stand-alone or inside Docker container. See [example](../../tests/serverless-plugins-integration/serverless.sqs.yml) `sqs` service setup.
+[ElasticMQ](https://github.com/adamw/elasticmq) is a standalone in-memory queue system, which implements AWS SQS compatible interface. It can be run either stand-alone or inside Docker container.
 
-We also need to setup actual queue in ElasticMQ server, we can use [AWS cli](https://aws.amazon.com/cli/) tools for that. In example, we spawn-up another container with `aws-cli` pre-installed and run initialization script, against ElasticMQ server in separate container.
+To set up the actual queue in ElasticMQ server, you can use [AWS CLI](https://aws.amazon.com/cli/) tools. For example, you can run ElasticMQ in a Docker container and use another container with `aws-cli` pre-installed to run initialization scripts against the ElasticMQ server.
 
 Once ElasticMQ is running and initialized, we can proceed with the configuration of the plugin.
 
 Note that starting from version v3.1 of the plugin, it supports autocreation of SQS fifo queues that are specified in the cloudformation `Resources`.
+
+## Node.js v22 Compatibility
+
+This version includes fixes for Node.js v22 compatibility, including:
+- Replaced `@serverless/utils/log` with a simple logger to avoid module resolution issues
+- Updated dependencies to support Node.js v22
+- Tested with serverless-offline v13.6.0 and v14.x
 
 ## Configure
 
