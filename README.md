@@ -1,60 +1,46 @@
 # serverless-offline-sqs
 
-### Why we forked (copied) this repo?
-
-We have to changed in file `sqs.js` how lambda was launched.
-
-Old method:
-```javascript
-const lambdaFunction = this.lambda.get(functionKey);
-const event = new SQSEvent(Messages, this.region, arn);
-lambdaFunction.setEvent(event);
-await lambdaFunction.runHandler();
-```
-New method:
-```javascript
-const url = `http://localhost:3002/2015-03-31/functions/aws-vida-local-${functionKey}/invocations`
-const event = new SQSEvent(Messages, this.region, arn);
-await fetch(url, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify(event)
-});
-```
-(also was need to add `node-fetch` in version 2.
-
-### Why we need this changes?
-In typeorm we are finding metadata using comparison of functions. Lambda launched by this plugin using the same RDS connection had problem with comparing metadata functions (cannot find it using function comparison). 
-
-Launching it in this way is solving this problem. Another solution was to using another RDS connections, or reset actual one but this was causing another problems.
-
-### Used version: 6.0.0
-Higher had problem with our actual version of serverless.
-
-### Link to oroginal repo: 
-https://github.com/CoorpAcademy/serverless-plugins
-
-# ORIGINAL README:
-
-
 This Serverless-offline plugin emulates AWS λ and SQS queue on your local machine. To do so, it listens SQS queue and invokes your handlers.
 
 _Features_:
 
 - [Serverless Webpack](https://github.com/serverless-heaven/serverless-webpack/) support.
 - SQS configurations: batchsize.
+- Node.js v22 compatibility
+- Support for serverless-offline v13 and v14
+
+## Requirements
+
+- Node.js >= 22.0.0 (required for this version)
+- serverless-offline ^13.0.0 or ^14.0.0
 
 ## Installation
 
-First, add `serverless-offline-sqs` to your project:
+### From npm registry
 
 ```sh
 npm install serverless-offline-sqs
 ```
 
-Then inside your project's `serverless.yml` file, add following entry to the plugins section before `serverless-offline` (and after `serverless-webpack` if presents): `serverless-offline-sqs`.
+### From GitHub (vdms-hq organization)
+
+To install a specific branch from the GitHub repository:
+
+```sh
+npm install github:vdms-hq/serverless-offline-sqs#node-v22-support
+```
+
+Or add to your `package.json`:
+
+```json
+{
+  "devDependencies": {
+    "serverless-offline-sqs": "github:vdms-hq/serverless-offline-sqs#node-v22-support"
+  }
+}
+```
+
+Then inside your project's `serverless.yml` file, add following entry to the plugins section before `serverless-offline` (and after `serverless-webpack` if present): `serverless-offline-sqs`.
 
 ```yml
 plugins:
@@ -63,19 +49,24 @@ plugins:
   - serverless-offline
 ```
 
-[See example](../../tests/serverless-plugins-integration/README.md#sqs)
-
 ## How it works?
 
 To be able to emulate AWS SQS queue on local machine there should be some queue system actually running. One of the existing implementations suitable for the task is [ElasticMQ](https://github.com/adamw/elasticmq).
 
-[ElasticMQ](https://github.com/adamw/elasticmq) is a standalone in-memory queue system, which implements AWS SQS compatible interface. It can be run either stand-alone or inside Docker container. See [example](../serverless-offline-sqs-integration/docker-compose.yml) `sqs` service setup.
+[ElasticMQ](https://github.com/adamw/elasticmq) is a standalone in-memory queue system, which implements AWS SQS compatible interface. It can be run either stand-alone or inside Docker container.
 
-We also need to setup actual queue in ElasticMQ server, we can use [AWS cli](https://aws.amazon.com/cli/) tools for that. In example, we spawn-up another container with `aws-cli` pre-installed and run initialization script, against ElasticMQ server in separate container.
+To set up the actual queue in ElasticMQ server, you can use [AWS CLI](https://aws.amazon.com/cli/) tools. For example, you can run ElasticMQ in a Docker container and use another container with `aws-cli` pre-installed to run initialization scripts against the ElasticMQ server.
 
 Once ElasticMQ is running and initialized, we can proceed with the configuration of the plugin.
 
 Note that starting from version v3.1 of the plugin, it supports autocreation of SQS fifo queues that are specified in the cloudformation `Resources`.
+
+## Node.js v22 Compatibility
+
+This version includes fixes for Node.js v22 compatibility, including:
+- Replaced `@serverless/utils/log` with a simple logger to avoid module resolution issues
+- Updated dependencies to support Node.js v22
+- Tested with serverless-offline v13.6.0 and v14.x
 
 ## Configure
 

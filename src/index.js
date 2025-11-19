@@ -12,9 +12,17 @@ const {
   toPairs
 } = require('lodash/fp');
 
-const debugLog = require('serverless-offline/dist/debugLog').default;
-const {default: serverlessLog, setLog} = require('serverless-offline/dist/serverlessLog');
-const Lambda = require('serverless-offline/dist/lambda').default;
+// Simple logger to avoid Node v22 module resolution issues with @serverless/utils/log
+const log = {
+  debug: (...args) => {
+    if (process.env.SLS_DEBUG) {
+      console.log('[DEBUG]', ...args);
+    }
+  },
+  warning: (...args) => {
+    console.warn('[WARNING]', ...args);
+  }
+};
 
 const SQS = require('./sqs');
 
@@ -44,12 +52,10 @@ class ServerlessOfflineSQS {
     this.cliOptions = cliOptions;
     this.serverless = serverless;
 
-    setLog((...args) => serverless.cli.log(...args));
-
     this.hooks = {
       'offline:start:init': this.start.bind(this),
       'offline:start:ready': this.ready.bind(this),
-      'offline:start': this._startWithExplicitEnd.bind(this),
+      'offline:start': this._startWithReady.bind(this),
       'offline:start:end': this.end.bind(this)
     };
   }
@@ -61,7 +67,7 @@ class ServerlessOfflineSQS {
 
     const {sqsEvents, lambdas} = this._getEvents();
 
-    this._createLambda(lambdas);
+    await this._createLambda(lambdas);
 
     const eventModules = [];
 
@@ -71,28 +77,32 @@ class ServerlessOfflineSQS {
 
     await Promise.all(eventModules);
 
-    serverlessLog(`Starting Offline SQS: ${this.options.stage}/${this.options.region}.`);
+    this.serverless.cli.log(
+      `Starting Offline SQS at stage ${this.options.stage} (${this.options.region})`
+    );
   }
 
-  async ready() {
+  ready() {
     if (process.env.NODE_ENV !== 'test') {
-      await this._listenForTermination();
+      this._listenForTermination();
     }
   }
 
-  // eslint-disable-next-line class-methods-use-this
-  async _listenForTermination() {
-    const command = await new Promise(resolve => {
-      process.on('SIGINT', () => resolve('SIGINT')).on('SIGTERM', () => resolve('SIGTERM'));
-    });
+  _listenForTermination() {
+    const signals = ['SIGINT', 'SIGTERM'];
 
-    serverlessLog(`Got ${command} signal. Offline Halting...`);
+    signals.map(signal =>
+      process.on(signal, async () => {
+        this.serverless.cli.log(`Got ${signal} signal. Offline Halting...`);
+
+        await this.end();
+      })
+    );
   }
 
-  async _startWithExplicitEnd() {
+  async _startWithReady() {
     await this.start();
-    await this.ready();
-    this.end();
+    this.ready();
   }
 
   async end(skipExit) {
@@ -100,7 +110,7 @@ class ServerlessOfflineSQS {
       return;
     }
 
-    serverlessLog('Halting offline server');
+    this.serverless.cli.log('Halting offline server');
 
     const eventModules = [];
 
@@ -119,7 +129,8 @@ class ServerlessOfflineSQS {
     }
   }
 
-  _createLambda(lambdas) {
+  async _createLambda(lambdas) {
+    const {default: Lambda} = await import('serverless-offline/lambda');
     this.lambda = new Lambda(this.serverless, this.options);
 
     this.lambda.create(lambdas);
@@ -149,12 +160,12 @@ class ServerlessOfflineSQS {
       {},
       omitUndefined(defaultOptions),
       omitUndefined(provider),
-      omitUndefined(pick('location', offlineOptions)), // serverless-webpack support
+      omitUndefined(pick(['location', 'localEnvironment'], offlineOptions)), // serverless-webpack support
       omitUndefined(customOptions),
       omitUndefined(this.cliOptions)
     );
 
-    debugLog('options:', this.options);
+    log.debug('options:', this.options);
   }
 
   _getEvents() {
